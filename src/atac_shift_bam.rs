@@ -170,10 +170,6 @@ where
                     }
                     record.set_insert_size(tlen);
 
-                    // Need to truncate the cigar string to matches only
-                    // record.cigar().to_vec()[:end-start];
-
-
                     match (reverse, first_in_template) {
                         (true, true) => {
                             let mpos = record.mpos() + shift[0];
@@ -197,7 +193,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use tempdir::TempDir;
 
     use crate::atac_shift_bam;
