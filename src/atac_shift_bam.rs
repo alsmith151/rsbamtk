@@ -1,4 +1,5 @@
 //use rust_htslib::bam::record::Cigar;
+use log::{info, warn};
 use rust_htslib::bam::{Format, Header, Read};
 use std::collections::HashMap;
 use std::error::Error;
@@ -120,11 +121,10 @@ where
     let mut reader = rust_htslib::bam::Reader::from_path(bam_input)?;
     let header = Header::from_template(reader.header());
     let mut writer = rust_htslib::bam::Writer::from_path(bam_output, &header, Format::Bam)?;
-
     let chrom_dict = set_up_chromsizes(reader.header()).expect("Couldn't read chromsizes");
-
     let shift = vec![4, -5, 5, -4];
 
+    let mut read_counter = 0;
     for result in reader.records() {
         let mut record = result?;
 
@@ -181,7 +181,13 @@ where
                     }
                     _ => {}
                 };
+
                 writer.write(&record)?;
+            }
+            // Update counter
+            read_counter += 1;
+            if read_counter % 100000 == 0 {
+                println!("Shifted {} reads", read_counter);
             }
         }
     }
