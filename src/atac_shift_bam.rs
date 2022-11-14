@@ -1,4 +1,4 @@
-use rust_htslib::bam::record::Cigar;
+//use rust_htslib::bam::record::Cigar;
 use rust_htslib::bam::{Format, Header, Read};
 use std::collections::HashMap;
 use std::error::Error;
@@ -93,10 +93,10 @@ fn sanity_check_coordinates(
         end = chromsize
     }
 
-    if !(end - start < 1) {
-        return Some((start, end));
+    if end - start >= 1 {
+        Some((start, end))
     } else {
-        return None;
+        None
     }
 }
 
@@ -134,56 +134,54 @@ where
             let mut end = (start as usize + record.seq_len()) as i64;
             let reverse = record.is_reverse();
             let first_in_template = record.is_first_in_template();
-            let dtlen;
             let chromsize = chrom_dict
                 .get(&(record.tid() as u32))
                 .expect("Missing chromsize");
 
-            match (reverse, first_in_template) {
+            let dtlen = match (reverse, first_in_template) {
                 (true, true) => {
                     end += shift[1];
-                    dtlen = shift[1] - shift[0];
+                    shift[1] - shift[0]
                 }
                 (true, false) => {
                     end -= shift[2];
-                    dtlen = shift[3] - shift[2];
+                    shift[3] - shift[2]
                 }
                 (false, true) => {
                     start -= shift[3];
-                    dtlen = shift[3] - shift[2];
+                    shift[3] - shift[2]
                 }
                 (false, false) => {
                     start += shift[0];
-                    dtlen = shift[1] - shift[0];
+                    shift[1] - shift[0]
                 }
-            }
+            };
 
-            match sanity_check_coordinates(start, end, reverse, *chromsize as i64) {
-                Some((start, _end)) => {
-                    // Edit the record
-                    record.set_pos(start);
+            if let Some((start, _end)) =
+                sanity_check_coordinates(start, end, reverse, *chromsize as i64)
+            {
+                // Edit the record
+                record.set_pos(start);
 
-                    if tlen > 0 {
-                        tlen += dtlen;
-                    } else {
-                        tlen -= dtlen;
+                if tlen > 0 {
+                    tlen += dtlen;
+                } else {
+                    tlen -= dtlen;
+                }
+                record.set_insert_size(tlen);
+
+                match (reverse, first_in_template) {
+                    (true, true) => {
+                        let mpos = record.mpos() + shift[0];
+                        record.set_mpos(mpos)
                     }
-                    record.set_insert_size(tlen);
-
-                    match (reverse, first_in_template) {
-                        (true, true) => {
-                            let mpos = record.mpos() + shift[0];
-                            record.set_mpos(mpos)
-                        }
-                        (true, false) => {
-                            let mpos = record.mpos() - shift[3];
-                            record.set_mpos(mpos)
-                        }
-                        _ => {}
-                    };
-                    writer.write(&record)?;
-                }
-                None => {}
+                    (true, false) => {
+                        let mpos = record.mpos() - shift[3];
+                        record.set_mpos(mpos)
+                    }
+                    _ => {}
+                };
+                writer.write(&record)?;
             }
         }
     }
