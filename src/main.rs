@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{PathBuf};
 
 pub mod atac_shift_bam;
+pub mod subtract_regions;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -21,6 +22,24 @@ enum Commands {
         /// Output file name
         #[arg(short, long)]
         output: Option<PathBuf>,
+    },
+
+    Subtract {
+        /// Bed file for processing
+        #[arg(short='r', long="regions")]
+        regions: Option<PathBuf>,
+
+        /// Bam file for processing
+        #[arg(short='b', long="bam")]
+        bam: Option<PathBuf>,
+
+        /// Output file name
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Number of threads to use
+        #[arg(short, long)]
+        threads: Option<usize>,
     },
 }
 
@@ -46,11 +65,49 @@ fn main() -> Result<()> {
                     )
                 })?
             }
-
             _ => {
                 println!("Options not provided, will not run")
             }
         },
+
+        Some(Commands::Subtract {
+            regions: bed,
+            bam,
+            output,
+            threads,
+        }) => {
+            println!("Running subtract subcommand. Will subtract regions from BAM file.");
+
+            match (bed, bam) {
+                (Some(bed_file), Some(bam_file)) => {
+                    let output = match output {
+                        Some(output) => output.to_owned(),
+                        None => PathBuf::from("subtracted.bam"),
+                    };
+                    let threads = match threads {
+                        Some(threads) => *threads,
+                        None => 1,
+                    };
+
+                    println!("BED file: {}", bed_file.to_string_lossy());
+                    println!("BAM file: {}", bam_file.to_string_lossy());
+                    println!("Output file: {}", output.to_string_lossy());
+                    println!("Threads: {}", threads);
+                    
+                    subtract_regions::remove_regions_from_bam(
+                        bed_file.to_path_buf(),
+                        bam_file.to_path_buf(),
+                        output,
+                        threads,
+                    )?;
+                }
+                _ => {
+                    println!("Options not provided, will not run");
+                    return Ok(());
+                }
+            }
+        }
+
         _ => {
             println!("Subcommand not provided, will not run")
         }
