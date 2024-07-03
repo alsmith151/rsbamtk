@@ -4,6 +4,7 @@ use std::path::{PathBuf};
 
 pub mod atac_shift_bam;
 pub mod subtract_regions;
+pub mod split_sample_and_spikein;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -40,6 +41,23 @@ enum Commands {
         /// Number of threads to use
         #[arg(short, long)]
         threads: Option<usize>,
+    },
+
+    Split {
+        /// Bam file for processing
+        #[arg(short, long)]
+        bam: PathBuf,
+
+        /// Prefix to use for exogenous spike-in reads
+        /// If not provided will default to dm6_
+        #[arg(short, long)]
+        exogenous_prefix: Option<String>,
+
+
+        /// Output file prefix. The output files will be named as prefix_X.bam
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
     },
 }
 
@@ -107,6 +125,23 @@ fn main() -> Result<()> {
                 }
             }
         }
+
+        Some(Commands::Split { bam, exogenous_prefix, output }) => match (bam, output) {
+            (bam_file, Some(output_file)) => {
+                let exogenous_prefix = match exogenous_prefix {
+                    Some(prefix) => prefix.to_owned(),
+                    None => "dm6_".to_string(),
+                };
+                let mut  splitter =  split_sample_and_spikein::SplitBam::new(bam_file.to_path_buf(), output_file.to_path_buf())?;
+                let stats = splitter.split(exogenous_prefix.as_bytes())?;
+
+                stats.print();
+            }
+
+            _ => {
+                println!("Options not provided, will not run")
+            }
+        },
 
         _ => {
             println!("Subcommand not provided, will not run")
